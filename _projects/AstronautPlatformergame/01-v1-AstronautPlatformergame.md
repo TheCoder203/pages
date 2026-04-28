@@ -1,7 +1,7 @@
 ---
 layout: opencs
 title: Our game 
-permalink: /TestGame
+permalink: /AstronautPlatformergame
 ---
 
 <div id="gameContainer">
@@ -13,10 +13,10 @@ permalink: /TestGame
     // Adnventure Game assets locations
     import Core from "{{site.baseurl}}/assets/js/GameEnginev1.1/essentials/Game.js";
     import GameControl from "{{site.baseurl}}/assets/js/GameEnginev1.1/essentials/GameControl.js";
-    import GameLevelprologue from "{{site.baseurl}}/assets/js/projects/teamtestgame/levels/GameLevelprologue.js";
-    import GameLeveltest from "{{site.baseurl}}/assets/js/projects/teamtestgame/levels/GameLeveltest.js";
-    import GameLevel2 from "{{site.baseurl}}/assets/js/projects/teamtestgame/levels/GameLevel2.js";
-    import GameLevelfinal from "{{site.baseurl}}/assets/js/projects/teamtestgame/levels/GameLevelfinal.js";
+    import GameLevelprologue from "{{site.baseurl}}/assets/js/projects/AstronautPlatformergame/levels/GameLevelprologue.js";
+    import GameLeveltest from "{{site.baseurl}}/assets/js/projects/AstronautPlatformergame/levels/GameLeveltest.js";
+    import GameLevel2 from "{{site.baseurl}}/assets/js/projects/AstronautPlatformergame/levels/GameLevel2.js";
+    import GameLevelfinal from "{{site.baseurl}}/assets/js/projects/AstronautPlatformergame/levels/GameLevelfinal.js";
     import Leaderboard from "{{site.baseurl}}/assets/js/GameEnginev1.1/essentials/Leaderboard.js";
 
 
@@ -27,7 +27,7 @@ permalink: /TestGame
     // Web Server Environment data
     const environment = {
         path:"{{site.baseurl}}",
-        gameName: "TestGame",
+        gameName: "AstronautPlatformergame",
         pythonURI: pythonURI,
         javaURI: javaURI,
         fetchOptions: fetchOptions,
