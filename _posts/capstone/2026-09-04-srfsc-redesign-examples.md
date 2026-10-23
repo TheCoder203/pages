@@ -21,6 +21,90 @@ year: "2026-2027"
   </div>
 </div>
 
+<script>
+  (function () {
+    const boardUrl = 'https://github.com/orgs/SRFSC-Organization/projects/1';
+    const projectItemsUrl = 'https://api.github.com/orgs/SRFSC-Organization/projectsV2/1/items?per_page=100';
+
+    function parseIssueNumber(url) {
+      const match = (url || '').match(/\/issues\/(\d+)(?:$|[?#])/i);
+      return match ? Number(match[1]) : null;
+    }
+
+    function applyAuthorNames() {
+      const board = document.querySelector(`[data-board-url="${boardUrl}"]`);
+      if (!board) return;
+
+      const cards = [...board.querySelectorAll('.ocs__kanban-item')];
+      if (!cards.length) return;
+
+      fetch(projectItemsUrl, {
+        headers: { Accept: 'application/vnd.github+json' }
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error(`GitHub API responded with ${response.status}`);
+          return response.json();
+        })
+        .then((data) => {
+          const items = Array.isArray(data) ? data : (Array.isArray(data.items) ? data.items : []);
+          const authorsByNumber = {};
+
+          items.forEach((item) => {
+            const content = item && item.content ? item.content : null;
+            const author = content && content.user && content.user.login ? content.user.login : null;
+            const issueNumber = content && Number.isFinite(content.number) ? content.number : null;
+            if (author && issueNumber) authorsByNumber[issueNumber] = author;
+          });
+
+          cards.forEach((card) => {
+            const issueNumber = parseIssueNumber(card.getAttribute('href') || '');
+            const author = issueNumber && authorsByNumber[issueNumber];
+            if (!author) return;
+
+            const note = card.querySelector('.ocs__kanban-note');
+            if (!note) {
+              const extra = document.createElement('div');
+              extra.className = 'ocs__kanban-note';
+              extra.textContent = `Created by @${author}`;
+              card.appendChild(extra);
+              return;
+            }
+
+            const text = note.textContent || '';
+            if (!text.includes(`Created by @${author}`)) {
+              note.textContent = text ? `${text} · Created by @${author}` : `Created by @${author}`;
+            }
+          });
+        })
+        .catch((error) => {
+          console.warn('SRFSC kanban author lookup failed:', error);
+        });
+    }
+
+    const tryApply = () => {
+      const board = document.querySelector(`[data-board-url="${boardUrl}"]`);
+      if (board && board.querySelector('.ocs__kanban-item')) {
+        applyAuthorNames();
+        return true;
+      }
+      return false;
+    };
+
+    if (!tryApply()) {
+      const observer = new MutationObserver(() => {
+        if (tryApply()) observer.disconnect();
+      });
+      observer.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true
+      });
+      setTimeout(() => {
+        if (tryApply()) observer.disconnect();
+      }, 3000);
+    }
+  })();
+</script>
+
 <!-- markdownlint-disable MD033 MD010 MD012 -->
 <div class="ocs__grid ocs__grid--standard cols-2" style="margin-bottom: 1.5rem;">
     <div class="ocs__grid-cell ocs__grid-cell--header">Strengths vs Improvement</div>
