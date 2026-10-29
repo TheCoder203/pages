@@ -9,6 +9,31 @@ author: Krish Kelageri, Jasan Boprai, Shourya Patel
 year: "2026-2027"
 ---
 
+<section class="ocs__card ocs__keypoints" id="about-srfsc" aria-labelledby="about-srfsc-title">
+  <h2 id="about-srfsc-title">About Scripps Ranch Fire Safe Council</h2>
+  <p>Founded in 2004, SRFSC is a volunteer-led 501(c)(3) serving 12,000 Scripps Ranch homes through wildfire education, vegetation management, and partnerships.</p>
+
+  <h3>History and milestones</h3>
+  <ul>
+    <li><strong>2003:</strong> Cedar Fire destroyed 312 homes. Flames stopped 70 feet from Chimney Canyon, threatening 200 more. Residents formed Chimney Canyon council to address dead eucalyptus and accumulated fuel.</li>
+    <li><strong>2004:</strong> San Diego County’s first urban Fire Safe Council incorporated. Two federal grants and Conservation Corps support enabled a 100-foot firebreak.</li>
+    <li><strong>2005:</strong> Partnership with the Civic Association brought the SRFSC name, community-wide coverage, and a 12-agency alliance.</li>
+    <li><strong>2007:</strong> Preparedness helped protect homes during the Witch Creek Fire.</li>
+  </ul>
+
+  <h3>Work and impact</h3>
+  <p>Impact: 650+ firebreaks, 340 hazardous trees removed, 165 trees planted, and six trails cleared.</p>
+  <p>Programs include defensible-space work with homeowners and the City, monthly newsletters, open houses, and the annual Play to Protect Golf Tournament. Partners include CAL FIRE, San Diego Fire-Rescue, the Civic Association, and California Conservation Corps.</p>
+
+  <h3>Leadership</h3>
+  <p>President: Kristin Rayder. Treasurer: Jessie Gates. Secretary: Karen Herreros. Directors: Dave Mason, Sandy Wetzel-Smith, Chad Smith.</p>
+
+  <h3>Contact and involvement</h3>
+  <p><a href="tel:+18582013711">858-201-3711</a> · <a href="mailto:srfiresafecouncil@gmail.com">srfiresafecouncil@gmail.com</a><br>9903 Businesspark Ave #102, San Diego, CA 92131.</p>
+  <p>Volunteers and donations support ongoing prevention.</p>
+  <p class="ocs__text">Summarized from <a href="https://srfiresafe.org/about/" target="_blank" rel="noopener noreferrer">SRFSC’s organization overview</a>.</p>
+</section>
+
 <div class="comms-infograph">
   <div class="comms-header">
     <div class="comms-badge">Design-Based Research Capstone</div>
