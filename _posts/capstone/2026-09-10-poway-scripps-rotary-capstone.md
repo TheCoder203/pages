@@ -10,6 +10,8 @@ categories: [Capstone]
 permalink: /capstone/poway-scripps-rotary/
 ---
 
+The Rotary Club of Poway-Scripps is a community service club in San Diego County affiliated with Rotary International, whose motto is "Service Above Self." Its members meet weekly in Poway to plan hands-on projects such as the annual Poway Days Parade, school food pantries and scholarships, blood drives, and support for local nonprofits and families in need.
+
 > Helping the Poway Scripps Rotary Club improve their website. This means cleaner UI, galleries instead of long sheets of images, and improved navbar and search features. This is a student capstone, not an official Rotary International product or a replacement for the official club site.
 
 <div class="ocs__grid ocs__grid--color cols-2" style="margin-bottom: 1.5rem;">
@@ -92,6 +94,12 @@ permalink: /capstone/poway-scripps-rotary/
         <p>Gallery browsing, navbar navigation, and search-assisted discovery.</p>
     </div>
 </div>
+
+<!-- Sprint Board: live from the team's GitHub project, like Communication Systems -->
+{% assign rotary_data = site.data.rotary_club %}
+{% if rotary_data.Board %}
+{% include ocs_kanban_board.html url=rotary_data.Board.url filter=rotary_data.Board.filter %}
+{% endif %}
 
 <p style="display:flex;flex-wrap:wrap;gap:.7rem;margin-bottom:1.5rem;">
     <a class="glowOnHover" style="padding:.65rem 1.15rem;text-decoration:none;display:inline-block;" href="https://powayscrippsrotary.org/">The Current Site ↗</a>
