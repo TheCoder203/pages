@@ -22,6 +22,32 @@ year: "2026-2027"
 {% include ocs_kanban_board.html url="https://github.com/orgs/SRFSC-Organization/projects/1" title="SRFSC Project Board" %}
 </div>
 
+<script type="module" id="srfsc-owner-names">
+  const ownerNames = new Map([
+    ['jas-bop', 'Jasan'],
+    ['thecoder203', 'Krish'],
+    ['shouryap4123', 'Shourya'],
+  ]);
+  const boardMount = document.querySelector('.srfsc-kanban-board [data-hook="mount"]');
+
+  function showOwnerNames() {
+    boardMount.querySelectorAll('.ocs__kanban-note').forEach((note) => {
+      // Keep the shipped date and any unfamiliar names exactly as received.
+      const [people, ...details] = note.textContent.split(' · ');
+      const names = people.split(', ').map((name) => ownerNames.get(name.toLowerCase()) || name);
+      const display = [names.join(', '), ...details].join(' · ');
+      if (note.textContent !== display) note.textContent = display;
+    });
+  }
+
+  if (boardMount) {
+    // The shared board replaces its cards on load, filtering, and expansion.
+    const observer = new MutationObserver(showOwnerNames);
+    observer.observe(boardMount, { childList: true, subtree: true, characterData: true });
+    showOwnerNames();
+  }
+</script>
+
 <!-- markdownlint-disable MD033 MD010 MD012 -->
 <div class="ocs__grid ocs__grid--standard cols-2" style="margin-bottom: 1.5rem;">
     <div class="ocs__grid-cell ocs__grid-cell--header">Strengths vs Improvement</div>
@@ -97,6 +123,11 @@ year: "2026-2027"
 
 <style>
   /* Keep this board's presentation entirely within the SRFSC page. */
+  .srfsc-kanban-board {
+    margin: 1.5rem 0 2rem;
+    font-family: system-ui, sans-serif;
+  }
+
   .srfsc-kanban-board > [data-ocs-kanban] {
     --pref-text-color: #e6edf3;
     --text-muted: #ababab;
@@ -105,12 +136,13 @@ year: "2026-2027"
     --ui-border: #383838;
     min-width: 0;
     max-width: 100%;
-    margin-bottom: 2rem;
+    margin: 0;
     padding: 1rem;
     border: 0;
     background: #292929;
     box-shadow: none;
     color: #e6edf3;
+    border-radius: 1rem;
   }
 
   .srfsc-kanban-board [data-hook="mount"],
@@ -121,17 +153,44 @@ year: "2026-2027"
 
   .srfsc-kanban-board [data-ocs-kanban] > .ocs__links {
     margin-bottom: 1rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid #383838;
+  }
+
+  .srfsc-kanban-board [data-hook="title"] {
+    color: #e6edf3;
+    font-size: 1.1rem;
+  }
+
+  .srfsc-kanban-board [data-hook="meta"],
+  .srfsc-kanban-board .ocs__text {
+    color: #ababab !important;
+    font-size: 0.9rem;
+  }
+
+  .srfsc-kanban-board [data-ocs-kanban] > .ocs__links > a {
+    margin-left: auto;
   }
 
   .srfsc-kanban-board .ocs__links {
     gap: 0.65rem;
     flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .srfsc-kanban-board [data-hook="mount"] > .ocs__keypoints {
+    gap: 1rem;
   }
 
   .srfsc-kanban-board .ocs__btn.pill {
     background: #1b2230;
     border-color: transparent;
     color: #3b82f6;
+    border-radius: 999px !important;
+    padding: 0.4rem 0.8rem;
+    min-height: 2.25rem;
+    font-size: 0.95rem;
+    line-height: 1.3;
   }
 
   .srfsc-kanban-board .ocs__btn[aria-pressed="true"] {
@@ -139,22 +198,58 @@ year: "2026-2027"
     color: #e6edf3;
   }
 
+  .srfsc-kanban-board .ocs__btn.pill:hover {
+    background: #24344c;
+  }
+
+  .srfsc-kanban-board .ocs__toggle {
+    gap: 0.6rem;
+    margin: 0;
+  }
+
+  .srfsc-kanban-board .ocs__toggle-label {
+    color: #e6edf3 !important;
+    font-size: 0.95rem;
+  }
+
+  .srfsc-kanban-board .ocs__toggle-track {
+    background: #252525;
+    border: 1px solid #383838;
+  }
+
+  .srfsc-kanban-board .ocs__toggle-input:checked + .ocs__toggle-track {
+    background: #2563eb;
+  }
+
   .srfsc-kanban-board .ocs__kanban-board {
+    display: grid;
+    grid-auto-flow: column;
     grid-auto-columns: minmax(min(16rem, 100%), 1fr);
-    gap: 0.85rem;
+    align-items: stretch;
+    gap: 1rem;
     margin: 0;
     padding: 0 0 0.5rem;
     list-style: none;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-color: #515151 #292929;
   }
 
   .srfsc-kanban-board .ocs__kanban-column {
-    gap: 0.75rem;
-    padding: 0.85rem;
+    display: grid;
+    align-content: start;
+    min-width: 0;
+    min-height: 36rem;
+    margin: 0;
+    gap: 0.85rem;
+    padding: 0.9rem;
     border: 1px solid #383838;
     border-top: 3px solid #3b82f6;
     border-radius: 0.75rem;
     background: #303030;
     color: #e6edf3 !important;
+    scroll-snap-align: start;
   }
 
   .srfsc-kanban-board .ocs__kanban-column[data-stage="todo"] {
@@ -164,9 +259,10 @@ year: "2026-2027"
   .srfsc-kanban-board .ocs__kanban-column > div:first-child {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    margin-bottom: 0.35rem;
-    font-size: 1.05rem;
+    gap: 0.5rem;
+    min-height: 2rem;
+    margin-bottom: 0.4rem;
+    font-size: 1.15rem;
     color: #e6edf3 !important;
   }
 
@@ -174,40 +270,95 @@ year: "2026-2027"
     background: #2c2c2c;
     border: 1px solid #3a3a3a;
     color: #ababab !important;
-    font-size: 0.75rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+
+  .srfsc-kanban-board [data-column-toggle]:hover {
+    color: #e6edf3 !important;
+    border-color: #64748b;
   }
 
   .srfsc-kanban-board .ocs__kanban-item {
-    padding: 0.75rem;
-    border-radius: 0.65rem;
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.85rem;
+    border-radius: 0.75rem;
     border: 1px solid #353535;
     background: #292929;
     overflow-wrap: anywhere;
+    margin: 0;
+    text-decoration: none;
+    text-align: left;
+    box-shadow: none;
   }
 
   .srfsc-kanban-board .ocs__kanban-item:hover,
   .srfsc-kanban-board .ocs__kanban-item:focus-visible {
     background: #2b3038;
     border-color: #3b82f6;
+    text-decoration: none;
+    transform: none;
+  }
+
+  .srfsc-kanban-board a:focus-visible,
+  .srfsc-kanban-board button:focus-visible {
+    outline: 2px solid #60a5fa;
+    outline-offset: 3px;
   }
 
   .srfsc-kanban-board .ocs__kanban-kicker {
-    font-size: 0.68rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
     letter-spacing: 0.035em;
     color: #ababab !important;
   }
 
   .srfsc-kanban-board .ocs__kanban-name {
-    font-size: 0.95rem;
+    font-size: 1rem;
     font-weight: 700;
     line-height: 1.4;
     color: #e6edf3 !important;
   }
 
   .srfsc-kanban-board .ocs__kanban-note {
-    font-size: 0.85rem;
-    line-height: 1.4;
+    font-size: 0.9rem;
+    line-height: 1.45;
     color: #ababab !important;
+  }
+
+  /* Let the board use the screen while the rest of the article stays narrow. */
+  @media (min-width: 1200px) {
+    .srfsc-kanban-board {
+      position: relative;
+      left: 50%;
+      width: calc(100vw - 5rem);
+      max-width: 1600px;
+      transform: translateX(-50%);
+    }
+  }
+
+  @media (max-width: 600px) {
+    .srfsc-kanban-board > [data-ocs-kanban] {
+      padding: 0.65rem;
+    }
+
+    .srfsc-kanban-board .ocs__kanban-board {
+      grid-auto-columns: minmax(0, 88%);
+      gap: 0.65rem;
+    }
+
+    .srfsc-kanban-board .ocs__kanban-column {
+      min-height: 28rem;
+      padding: 0.75rem;
+    }
+
+    .srfsc-kanban-board [data-ocs-kanban] > .ocs__links > a {
+      margin-left: 0;
+    }
   }
 
   .srfsc-mermaid-wrap {
