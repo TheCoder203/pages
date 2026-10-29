@@ -43,34 +43,170 @@ year: "2026-2027"
 
 </div>
 
-<div class="capstone-kanban-embed srfsc-kanban-board">
-{% include ocs_kanban_board.html url="https://github.com/orgs/SRFSC-Organization/projects/1" title="SRFSC Project Board" %}
-</div>
+<section class="srfsc-kanban-board" id="srfsc-board" aria-label="SRFSC project board">
+  <div class="srfsc-board-toolbar">
+    <div class="srfsc-team-filters" role="group" aria-label="Filter issues by team member"></div>
+    <label class="srfsc-backlog-toggle">
+      <input type="checkbox" aria-label="Show backlog">
+      <span class="srfsc-toggle-track" aria-hidden="true"></span>
+      <span class="srfsc-backlog-label">💡 Backlog (0)</span>
+    </label>
+  </div>
+  <p class="srfsc-board-status" role="status">Loading the SRFSC board…</p>
+  <ul class="ocs__kanban-board" aria-label="Issue columns"></ul>
+  <div class="srfsc-board-footer">
+    <span class="srfsc-board-meta"></span>
+    <a href="https://github.com/orgs/SRFSC-Organization/projects/1" target="_blank" rel="noopener noreferrer">Open on GitHub ↗</a>
+  </div>
+</section>
+<script type="application/json" id="srfsc-kanban-defaults">{{ site.data.kanban | jsonify | replace: "<", "\u003c" }}</script>
 
 <script type="module" id="srfsc-owner-names">
+  import { boardConfig, parseBoardUrl, refreshBoard, columnCards, readEntry, writeEntry, cacheState } from '{{ site.baseurl }}/assets/js/kanban-board.js';
+
+  const root = document.getElementById('srfsc-board');
+  const config = boardConfig(JSON.parse(document.getElementById('srfsc-kanban-defaults').textContent));
   const ownerNames = new Map([
     ['jas-bop', 'Jasan'],
     ['thecoder203', 'Krish'],
     ['shouryap4123', 'Shourya'],
+    ['shouryap4132', 'Shourya'],
   ]);
-  const boardMount = document.querySelector('.srfsc-kanban-board [data-hook="mount"]');
+  const columnLabels = [['todo', 'To do'], ['doing', 'In progress'], ['review', 'In review'], ['done', 'Done']];
+  const state = { owner: 'all', backlog: false, expanded: new Set() };
+  const cacheKey = 'srfsc-board:owners:v1';
+  let board;
 
-  function showOwnerNames() {
-    boardMount.querySelectorAll('.ocs__kanban-note').forEach((note) => {
-      // Keep the shipped date and any unfamiliar names exactly as received.
-      const [people, ...details] = note.textContent.split(' · ');
-      const names = people.split(', ').map((name) => ownerNames.get(name.toLowerCase()) || name);
-      const display = [names.join(', '), ...details].join(' · ');
-      if (note.textContent !== display) note.textContent = display;
+  function element(tag, className, text) {
+    const node = document.createElement(tag);
+    node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function ownerName(login) {
+    return ownerNames.get(login.toLowerCase()) || login;
+  }
+
+  function cardElement(card) {
+    const link = element('a', 'ocs__kanban-item');
+    link.href = card.url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.append(element('div', 'ocs__kanban-kicker', 'SRFSC'), element('div', 'ocs__kanban-name', card.title));
+    const names = card.people.map(ownerName).join(', ') || 'Unassigned';
+    const date = card.shipped ? new Date(`${card.shipped}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    const people = element('div', 'ocs__kanban-note', [names, date].filter(Boolean).join(' · '));
+    people.title = `${card.ownerKind || 'Assigned to'}: ${names}`;
+    link.append(people);
+    card.details.forEach(({ name, value }) => link.append(element('div', 'ocs__kanban-note', `${name}: ${value}`)));
+    const proof = element('div', 'ocs__kanban-evidence');
+    if (card.checklist) proof.append(element('span', 'ocs__status-pill', `☑ ${card.checklist.done}/${card.checklist.total}`));
+    card.prs.forEach((pr) => proof.append(element('span', 'ocs__status-pill', `PR #${pr.number}${pr.state === 'merged' ? ' ✓' : ''}`)));
+    if (proof.childElementCount) link.append(proof);
+    return link;
+  }
+
+  function renderColumn(column, cards) {
+    const list = columnCards(cards, column);
+    const item = element('li', 'ocs__kanban-column');
+    item.dataset.stage = column.stage || 'backlog';
+    const heading = element('div', 'srfsc-column-heading');
+    heading.append(element('strong', '', column.label), element('span', 'ocs__status-pill', String(list.length)));
+    item.append(heading);
+    const expanded = state.expanded.has(column.key);
+    (expanded ? list : list.slice(0, 5)).forEach((card) => item.append(cardElement(card)));
+    if (!list.length) item.append(element('div', 'srfsc-empty-column', 'No issues'));
+    if (list.length > 5) {
+      const more = element('button', 'srfsc-more', expanded ? 'Show less' : `+${list.length - 5} more`);
+      more.type = 'button';
+      more.dataset.column = column.key;
+      more.setAttribute('aria-expanded', String(expanded));
+      more.addEventListener('click', () => {
+        if (expanded) state.expanded.delete(column.key);
+        else state.expanded.add(column.key);
+        render();
+        [...root.querySelectorAll('[data-column]')].find((button) => button.dataset.column === column.key)?.focus();
+      });
+      item.append(more);
+    }
+    return item;
+  }
+
+  function render() {
+    const cards = board.cards.filter((card) => state.owner === 'all' || card.people.some((name) => ownerName(name) === ownerName(state.owner)));
+    const columns = columnLabels.map(([stage, label]) => board.columns.find((col) => col.stage === stage) || { key: stage, stage, label });
+    // Keep custom GitHub statuses accessible alongside the four reference columns.
+    const extra = board.columns.filter((col) => !columnLabels.some(([stage]) => stage === col.stage));
+    const backlog = extra.filter((col) => col.collapsed || col.stage === 'backlog');
+    const regular = extra.filter((col) => !backlog.includes(col));
+    const count = cards.filter((card) => backlog.some((col) => col.key === card.column)).length;
+    root.querySelector('.srfsc-backlog-label').textContent = `💡 Backlog (${count})`;
+    const shown = [...(state.backlog ? backlog : []), ...columns, ...regular];
+    root.querySelector('.ocs__kanban-board').replaceChildren(...shown.map((column) => renderColumn(column, cards)));
+    root.querySelectorAll('[data-owner]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.owner === state.owner)));
+    root.querySelector('.srfsc-board-meta').textContent = `${board.cards.length} issues · Assignees shown; creator shown when unassigned`;
+  }
+
+  [['all', 'All'], ['jas-bop', 'Jasan'], ['thecoder203', 'Krish'], ['shouryap4123', 'Shourya']].forEach(([login, name]) => {
+    const button = element('button', 'srfsc-team-button', name);
+    button.type = 'button';
+    button.dataset.owner = login;
+    button.setAttribute('aria-pressed', String(login === state.owner));
+    button.addEventListener('click', () => {
+      state.owner = login;
+      state.expanded.clear();
+      if (board) render();
     });
-  }
+    root.querySelector('.srfsc-team-filters').append(button);
+  });
+  root.querySelector('.srfsc-team-filters').prepend(element('span', 'srfsc-team-label', 'Team'));
+  root.querySelector('input[type="checkbox"]').addEventListener('change', (event) => {
+    state.backlog = event.target.checked;
+    if (board) render();
+  });
 
-  if (boardMount) {
-    // The shared board replaces its cards on load, filtering, and expansion.
-    const observer = new MutationObserver(showOwnerNames);
-    observer.observe(boardMount, { childList: true, subtree: true, characterData: true });
-    showOwnerNames();
+  async function loadBoard() {
+    const status = root.querySelector('.srfsc-board-status');
+    const saved = readEntry(cacheKey);
+    if (saved?.board) {
+      board = saved.board;
+      render();
+      status.hidden = true;
+      if (cacheState(saved, Date.now()) === 'fresh') return;
+    }
+    const authors = new Map();
+    // Project issues often have no assignee. Preserve their actual creator,
+    // which the shared normalized board otherwise leaves out.
+    async function fetchWithAuthors(url, options) {
+      const response = await fetch(url, options);
+      if (response.ok && url.includes('/items?')) {
+        const items = await response.clone().json();
+        items.forEach(({ content }) => {
+          if (content?.user?.login) authors.set(content.html_url, content.user.login);
+        });
+      }
+      return response;
+    }
+    try {
+      const entry = await refreshBoard(parseBoardUrl('https://github.com/orgs/SRFSC-Organization/projects/1'), { config, fetchImpl: fetchWithAuthors });
+      entry.board.cards.forEach((card) => {
+        card.ownerKind = 'Assigned to';
+        if (!card.people.length && authors.has(card.url)) {
+          card.people = [authors.get(card.url)];
+          card.ownerKind = 'Created by';
+        }
+      });
+      board = entry.board;
+      writeEntry(cacheKey, entry);
+      render();
+      status.hidden = true;
+    } catch (error) {
+      status.hidden = false;
+      status.textContent = `${board ? 'Showing the saved board. ' : ''}Unable to refresh from GitHub. ${error.message}`;
+    }
   }
+  loadBoard();
 </script>
 
 <!-- markdownlint-disable MD033 MD010 MD012 -->
@@ -147,243 +283,110 @@ year: "2026-2027"
 > A stronger homepage should feel calm, urgent, and clear at the same time: the message is important, the next step is obvious, and the local community feels included.
 
 <style>
-  /* Keep this board's presentation entirely within the SRFSC page. */
-  .srfsc-kanban-board {
+  /* This page owns its board presentation; shared styles and scripts stay untouched. */
+  #srfsc-board {
+    box-sizing: border-box;
     margin: 1.5rem 0 2rem;
-    font-family: system-ui, sans-serif;
-  }
-
-  .srfsc-kanban-board > [data-ocs-kanban] {
-    --pref-text-color: #e6edf3;
-    --text-muted: #ababab;
-    --pref-accent-color: #3b82f6;
-    --panel: #292929;
-    --ui-border: #383838;
-    min-width: 0;
-    max-width: 100%;
-    margin: 0;
-    padding: 1rem;
-    border: 0;
+    padding: 16px;
     background: #292929;
-    box-shadow: none;
-    color: #e6edf3;
-    border-radius: 1rem;
-  }
-
-  .srfsc-kanban-board [data-hook="mount"],
-  .srfsc-kanban-board .ocs__keypoints {
-    min-width: 0;
-    max-width: 100%;
-  }
-
-  .srfsc-kanban-board [data-ocs-kanban] > .ocs__links {
-    margin-bottom: 1rem;
-    padding-bottom: 0.85rem;
-    border-bottom: 1px solid #383838;
-  }
-
-  .srfsc-kanban-board [data-hook="title"] {
-    color: #e6edf3;
-    font-size: 1.1rem;
-  }
-
-  .srfsc-kanban-board [data-hook="meta"],
-  .srfsc-kanban-board .ocs__text {
-    color: #ababab !important;
-    font-size: 0.9rem;
-  }
-
-  .srfsc-kanban-board [data-ocs-kanban] > .ocs__links > a {
-    margin-left: auto;
-  }
-
-  .srfsc-kanban-board .ocs__links {
-    gap: 0.65rem;
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .srfsc-kanban-board [data-hook="mount"] > .ocs__keypoints {
-    gap: 1rem;
-  }
-
-  .srfsc-kanban-board .ocs__btn.pill {
-    background: #1b2230;
-    border-color: transparent;
-    color: #3b82f6;
-    border-radius: 999px !important;
-    padding: 0.4rem 0.8rem;
-    min-height: 2.25rem;
-    font-size: 0.95rem;
-    line-height: 1.3;
-  }
-
-  .srfsc-kanban-board .ocs__btn[aria-pressed="true"] {
-    background: #142b4b;
-    color: #e6edf3;
-  }
-
-  .srfsc-kanban-board .ocs__btn.pill:hover {
-    background: #24344c;
-  }
-
-  .srfsc-kanban-board .ocs__toggle {
-    gap: 0.6rem;
-    margin: 0;
-  }
-
-  .srfsc-kanban-board .ocs__toggle-label {
+    font-family: system-ui, sans-serif;
+    font-size: 16px;
     color: #e6edf3 !important;
-    font-size: 0.95rem;
   }
-
-  .srfsc-kanban-board .ocs__toggle-track {
-    background: #252525;
-    border: 1px solid #383838;
+  #srfsc-board * { box-sizing: border-box; }
+  #srfsc-board .srfsc-board-toolbar,
+  #srfsc-board .srfsc-team-filters {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
   }
-
-  .srfsc-kanban-board .ocs__toggle-input:checked + .ocs__toggle-track {
-    background: #2563eb;
+  #srfsc-board .srfsc-board-toolbar { margin-bottom: 16px; }
+  #srfsc-board .srfsc-team-label { color: #ababab !important; font-size: 18px; }
+  #srfsc-board .srfsc-team-button {
+    appearance: none;
+    padding: 6px 12px;
+    border: 0;
+    border-radius: 999px !important;
+    background: #1b2230;
+    color: #3b82f6 !important;
+    font: inherit;
+    font-size: 17px;
+    line-height: 1.3;
+    cursor: pointer;
   }
-
-  .srfsc-kanban-board .ocs__kanban-board {
+  #srfsc-board .srfsc-team-button[aria-pressed="true"] { background: #162b4b; color: #e6edf3 !important; }
+  #srfsc-board .srfsc-team-button:hover { background: #233651; }
+  #srfsc-board .srfsc-backlog-toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+  #srfsc-board .srfsc-backlog-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  #srfsc-board .srfsc-backlog-label { font-size: 18px; color: #e6edf3 !important; }
+  #srfsc-board .srfsc-toggle-track { position: relative; width: 54px; height: 32px; border-radius: 32px; border: 1px solid #333; background: #252525; }
+  #srfsc-board .srfsc-toggle-track::before { content: ""; position: absolute; width: 24px; height: 24px; top: 3px; left: 3px; border-radius: 50%; background: #e6edf3; transition: transform 0.15s ease; }
+  #srfsc-board input:checked + .srfsc-toggle-track { background: #2563eb; }
+  #srfsc-board input:checked + .srfsc-toggle-track::before { transform: translateX(22px); }
+  #srfsc-board input:focus-visible + .srfsc-toggle-track,
+  #srfsc-board a:focus-visible,
+  #srfsc-board button:focus-visible { outline: 2px solid #60a5fa; outline-offset: 3px; }
+  #srfsc-board .ocs__kanban-board {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: minmax(min(16rem, 100%), 1fr);
+    grid-auto-columns: minmax(250px, 1fr);
     align-items: stretch;
-    gap: 1rem;
+    gap: 14px;
     margin: 0;
-    padding: 0 0 0.5rem;
+    padding: 0 0 6px;
     list-style: none;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scroll-snap-type: x proximity;
     scrollbar-color: #515151 #292929;
   }
-
-  .srfsc-kanban-board .ocs__kanban-column {
-    display: grid;
-    align-content: start;
+  #srfsc-board .ocs__kanban-column {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
     min-width: 0;
-    min-height: 36rem;
+    min-height: 760px;
+    gap: 14px;
     margin: 0;
-    gap: 0.85rem;
-    padding: 0.9rem;
-    border: 1px solid #383838;
+    padding: 14px;
+    border: 1px solid #393939;
     border-top: 3px solid #3b82f6;
-    border-radius: 0.75rem;
+    border-radius: 14px;
     background: #303030;
     color: #e6edf3 !important;
     scroll-snap-align: start;
   }
-
-  .srfsc-kanban-board .ocs__kanban-column[data-stage="todo"] {
-    border-top-color: #5878a2;
-  }
-
-  .srfsc-kanban-board .ocs__kanban-column > div:first-child {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-height: 2rem;
-    margin-bottom: 0.4rem;
-    font-size: 1.15rem;
-    color: #e6edf3 !important;
-  }
-
-  .srfsc-kanban-board .ocs__status-pill--neutral {
-    background: #2c2c2c;
-    border: 1px solid #3a3a3a;
-    color: #ababab !important;
-    padding: 0.2rem 0.55rem;
-    border-radius: 999px;
-    font-size: 0.8rem;
-    line-height: 1.4;
-  }
-
-  .srfsc-kanban-board [data-column-toggle]:hover {
-    color: #e6edf3 !important;
-    border-color: #64748b;
-  }
-
-  .srfsc-kanban-board .ocs__kanban-item {
-    display: grid;
-    gap: 0.25rem;
-    padding: 0.85rem;
-    border-radius: 0.75rem;
-    border: 1px solid #353535;
-    background: #292929;
-    overflow-wrap: anywhere;
-    margin: 0;
-    text-decoration: none;
-    text-align: left;
-    box-shadow: none;
-  }
-
-  .srfsc-kanban-board .ocs__kanban-item:hover,
-  .srfsc-kanban-board .ocs__kanban-item:focus-visible {
-    background: #2b3038;
-    border-color: #3b82f6;
-    text-decoration: none;
-    transform: none;
-  }
-
-  .srfsc-kanban-board a:focus-visible,
-  .srfsc-kanban-board button:focus-visible {
-    outline: 2px solid #60a5fa;
-    outline-offset: 3px;
-  }
-
-  .srfsc-kanban-board .ocs__kanban-kicker {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.035em;
-    color: #ababab !important;
-  }
-
-  .srfsc-kanban-board .ocs__kanban-name {
-    font-size: 1rem;
-    font-weight: 700;
-    line-height: 1.4;
-    color: #e6edf3 !important;
-  }
-
-  .srfsc-kanban-board .ocs__kanban-note {
-    font-size: 0.9rem;
-    line-height: 1.45;
-    color: #ababab !important;
-  }
-
-  /* Let the board use the screen while the rest of the article stays narrow. */
+  #srfsc-board .ocs__kanban-column[data-stage="todo"] { border-top-color: #5878a2; }
+  #srfsc-board .srfsc-column-heading { display: flex; align-items: center; gap: 7px; min-height: 32px; margin-bottom: 2px; color: #e6edf3 !important; }
+  #srfsc-board .srfsc-column-heading strong { font-size: 20px; font-weight: 750; }
+  #srfsc-board .ocs__status-pill,
+  #srfsc-board .srfsc-more { width: fit-content; padding: 3px 9px; border: 1px solid #3a3a3a; border-radius: 999px !important; background: #2c2c2c; color: #ababab !important; font: inherit; font-size: 13px; font-weight: 600; line-height: 1.4; }
+  #srfsc-board .srfsc-more { cursor: pointer; }
+  #srfsc-board .srfsc-more:hover { border-color: #64748b; color: #e6edf3 !important; }
+  #srfsc-board .ocs__kanban-item { display: grid; gap: 4px; margin: 0; padding: 13px; border: 1px solid #363636; border-radius: 12px; background: #292929; text-decoration: none; text-align: left; box-shadow: none; overflow-wrap: anywhere; }
+  #srfsc-board .ocs__kanban-item:hover,
+  #srfsc-board .ocs__kanban-item:focus-visible { background: #292929; border-color: #3b82f6; text-decoration: none; transform: none; }
+  #srfsc-board .ocs__kanban-kicker { font-size: 12px; line-height: 1.4; font-weight: 700; letter-spacing: 0.035em; text-transform: uppercase; color: #ababab !important; }
+  #srfsc-board .ocs__kanban-name { font-size: 18px; line-height: 1.35; font-weight: 700; color: #e6edf3 !important; }
+  #srfsc-board .ocs__kanban-note { font-size: 16px; line-height: 1.4; color: #ababab !important; }
+  #srfsc-board .ocs__kanban-evidence { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  #srfsc-board .srfsc-empty-column { color: #ababab !important; font-size: 14px; }
+  #srfsc-board .srfsc-board-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding-top: 12px; font-size: 12px; }
+  #srfsc-board .srfsc-board-meta,
+  #srfsc-board .srfsc-board-status { color: #ababab !important; }
+  #srfsc-board .srfsc-board-footer a { color: #60a5fa; }
+  #srfsc-board [hidden] { display: none !important; }
   @media (min-width: 1200px) {
-    .srfsc-kanban-board {
-      position: relative;
-      left: 50%;
-      width: calc(100vw - 5rem);
-      max-width: 1600px;
-      transform: translateX(-50%);
-    }
+    #srfsc-board { position: relative; left: 50%; width: calc(100vw - 48px); max-width: none; transform: translateX(-50%); }
   }
-
   @media (max-width: 600px) {
-    .srfsc-kanban-board > [data-ocs-kanban] {
-      padding: 0.65rem;
-    }
-
-    .srfsc-kanban-board .ocs__kanban-board {
-      grid-auto-columns: minmax(0, 88%);
-      gap: 0.65rem;
-    }
-
-    .srfsc-kanban-board .ocs__kanban-column {
-      min-height: 28rem;
-      padding: 0.75rem;
-    }
-
-    .srfsc-kanban-board [data-ocs-kanban] > .ocs__links > a {
-      margin-left: 0;
-    }
+    #srfsc-board { padding: 10px; }
+    #srfsc-board .ocs__kanban-board { grid-auto-columns: 88%; gap: 10px; }
+    #srfsc-board .ocs__kanban-column { min-height: 580px; padding: 12px; }
+    #srfsc-board .srfsc-board-toolbar { gap: 12px; }
+    #srfsc-board .srfsc-team-filters { gap: 8px; }
   }
 
   .srfsc-mermaid-wrap {
