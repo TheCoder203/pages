@@ -16,94 +16,11 @@ year: "2026-2027"
     <p class="comms-description">The SRFSC homepage can be more direct and action-focused. The strongest example is to make the mission, volunteer path, and urgent neighborhood context visible immediately.</p>
   </div>
 
-  <div class="comms-card">
-    {% include ocs_kanban_board.html url="https://github.com/orgs/SRFSC-Organization/projects/1" title="SRFSC Project Board" %}
-  </div>
 </div>
 
-<script>
-  (function () {
-    const boardUrl = 'https://github.com/orgs/SRFSC-Organization/projects/1';
-    const projectItemsUrl = 'https://api.github.com/orgs/SRFSC-Organization/projectsV2/1/items?per_page=100';
-
-    function parseIssueNumber(url) {
-      const match = (url || '').match(/\/issues\/(\d+)(?:$|[?#])/i);
-      return match ? Number(match[1]) : null;
-    }
-
-    function applyAuthorNames() {
-      const board = document.querySelector(`[data-board-url="${boardUrl}"]`);
-      if (!board) return;
-
-      const cards = [...board.querySelectorAll('.ocs__kanban-item')];
-      if (!cards.length) return;
-
-      fetch(projectItemsUrl, {
-        headers: { Accept: 'application/vnd.github+json' }
-      })
-        .then((response) => {
-          if (!response.ok) throw new Error(`GitHub API responded with ${response.status}`);
-          return response.json();
-        })
-        .then((data) => {
-          const items = Array.isArray(data) ? data : (Array.isArray(data.items) ? data.items : []);
-          const authorsByNumber = {};
-
-          items.forEach((item) => {
-            const content = item && item.content ? item.content : null;
-            const author = content && content.user && content.user.login ? content.user.login : null;
-            const issueNumber = content && Number.isFinite(content.number) ? content.number : null;
-            if (author && issueNumber) authorsByNumber[issueNumber] = author;
-          });
-
-          cards.forEach((card) => {
-            const issueNumber = parseIssueNumber(card.getAttribute('href') || '');
-            const author = issueNumber && authorsByNumber[issueNumber];
-            if (!author) return;
-
-            const note = card.querySelector('.ocs__kanban-note');
-            if (!note) {
-              const extra = document.createElement('div');
-              extra.className = 'ocs__kanban-note';
-              extra.textContent = `Created by @${author}`;
-              card.appendChild(extra);
-              return;
-            }
-
-            const text = note.textContent || '';
-            if (!text.includes(`Created by @${author}`)) {
-              note.textContent = text ? `${text} · Created by @${author}` : `Created by @${author}`;
-            }
-          });
-        })
-        .catch((error) => {
-          console.warn('SRFSC kanban author lookup failed:', error);
-        });
-    }
-
-    const tryApply = () => {
-      const board = document.querySelector(`[data-board-url="${boardUrl}"]`);
-      if (board && board.querySelector('.ocs__kanban-item')) {
-        applyAuthorNames();
-        return true;
-      }
-      return false;
-    };
-
-    if (!tryApply()) {
-      const observer = new MutationObserver(() => {
-        if (tryApply()) observer.disconnect();
-      });
-      observer.observe(document.body || document.documentElement, {
-        childList: true,
-        subtree: true
-      });
-      setTimeout(() => {
-        if (tryApply()) observer.disconnect();
-      }, 3000);
-    }
-  })();
-</script>
+<div class="capstone-kanban-embed srfsc-kanban-board">
+{% include ocs_kanban_board.html url="https://github.com/orgs/SRFSC-Organization/projects/1" title="SRFSC Project Board" %}
+</div>
 
 <!-- markdownlint-disable MD033 MD010 MD012 -->
 <div class="ocs__grid ocs__grid--standard cols-2" style="margin-bottom: 1.5rem;">
@@ -179,6 +96,120 @@ year: "2026-2027"
 > A stronger homepage should feel calm, urgent, and clear at the same time: the message is important, the next step is obvious, and the local community feels included.
 
 <style>
+  /* Keep this board's presentation entirely within the SRFSC page. */
+  .srfsc-kanban-board > [data-ocs-kanban] {
+    --pref-text-color: #e6edf3;
+    --text-muted: #ababab;
+    --pref-accent-color: #3b82f6;
+    --panel: #292929;
+    --ui-border: #383838;
+    min-width: 0;
+    max-width: 100%;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    border: 0;
+    background: #292929;
+    box-shadow: none;
+    color: #e6edf3;
+  }
+
+  .srfsc-kanban-board [data-hook="mount"],
+  .srfsc-kanban-board .ocs__keypoints {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .srfsc-kanban-board [data-ocs-kanban] > .ocs__links {
+    margin-bottom: 1rem;
+  }
+
+  .srfsc-kanban-board .ocs__links {
+    gap: 0.65rem;
+    flex-wrap: wrap;
+  }
+
+  .srfsc-kanban-board .ocs__btn.pill {
+    background: #1b2230;
+    border-color: transparent;
+    color: #3b82f6;
+  }
+
+  .srfsc-kanban-board .ocs__btn[aria-pressed="true"] {
+    background: #142b4b;
+    color: #e6edf3;
+  }
+
+  .srfsc-kanban-board .ocs__kanban-board {
+    grid-auto-columns: minmax(min(16rem, 100%), 1fr);
+    gap: 0.85rem;
+    margin: 0;
+    padding: 0 0 0.5rem;
+    list-style: none;
+  }
+
+  .srfsc-kanban-board .ocs__kanban-column {
+    gap: 0.75rem;
+    padding: 0.85rem;
+    border: 1px solid #383838;
+    border-top: 3px solid #3b82f6;
+    border-radius: 0.75rem;
+    background: #303030;
+    color: #e6edf3 !important;
+  }
+
+  .srfsc-kanban-board .ocs__kanban-column[data-stage="todo"] {
+    border-top-color: #5878a2;
+  }
+
+  .srfsc-kanban-board .ocs__kanban-column > div:first-child {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.35rem;
+    font-size: 1.05rem;
+    color: #e6edf3 !important;
+  }
+
+  .srfsc-kanban-board .ocs__status-pill--neutral {
+    background: #2c2c2c;
+    border: 1px solid #3a3a3a;
+    color: #ababab !important;
+    font-size: 0.75rem;
+  }
+
+  .srfsc-kanban-board .ocs__kanban-item {
+    padding: 0.75rem;
+    border-radius: 0.65rem;
+    border: 1px solid #353535;
+    background: #292929;
+    overflow-wrap: anywhere;
+  }
+
+  .srfsc-kanban-board .ocs__kanban-item:hover,
+  .srfsc-kanban-board .ocs__kanban-item:focus-visible {
+    background: #2b3038;
+    border-color: #3b82f6;
+  }
+
+  .srfsc-kanban-board .ocs__kanban-kicker {
+    font-size: 0.68rem;
+    letter-spacing: 0.035em;
+    color: #ababab !important;
+  }
+
+  .srfsc-kanban-board .ocs__kanban-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.4;
+    color: #e6edf3 !important;
+  }
+
+  .srfsc-kanban-board .ocs__kanban-note {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #ababab !important;
+  }
+
   .srfsc-mermaid-wrap {
     width: 100%;
     overflow-x: auto;
